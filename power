@@ -1,0 +1,28 @@
+# Convert JSON to PowerShell object
+$jsonObject = ConvertFrom-Json -InputObject $jsonData
+
+# Initialize an array to hold the data
+$output = @()
+
+# Loop through each user in the result array
+foreach ($user in $jsonObject.result) {
+    $firstName = $user.firstName
+    $lastName = $user.lastName
+    $role = $user.roles -join ','
+    $lastAccess = [datetime]::FromFileTime($user.lastAccess).ToString('yyyy-MM-dd HH:mm:ss')
+    $enabled = if ($user.enabled) { "Enabled" } else { "Disabled" }
+
+    # Add data to the output array
+    $output += [PSCustomObject]@{
+        'First Name' = $firstName
+        'Last Name' = $lastName
+        'Role' = $role
+        'Last Access (System Date)' = $lastAccess
+        'Enabled' = $enabled
+    }
+}
+
+# Export the output to CSV
+$output | Export-Csv -Path 'user_data.csv' -NoTypeInformation
+
+Write-Host "CSV file created successfully."

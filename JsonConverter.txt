@@ -1,0 +1,122 @@
+Option Explicit
+
+Private Const MODULE_NAME As String = "JsonConverter"
+
+Private Type JsonParserState
+    Json As String
+    Position As Long
+End Type
+
+Public Function ParseJson(ByVal Json As String) As Object
+    Dim state As JsonParserState
+    state.Json = Json
+    state.Position = 1
+    Set ParseJson = ParseValue(state)
+End Function
+
+Private Function ParseObject(ByRef state As JsonParserState) As Object
+    Dim key As String
+    Dim dict As Object
+    Set dict = CreateObject("Scripting.Dictionary")
+    state.Position = state.Position + 1 ' Skip '{'
+    Do While Mid(state.Json, state.Position, 1) <> "}"
+        ParseWhitespace state
+        key = ParseString(state)
+        ParseWhitespace state
+        state.Position = state.Position + 1 ' Skip ':'
+        ParseWhitespace state
+        dict(key) = ParseValue(state)
+        ParseWhitespace state
+        If Mid(state.Json, state.Position, 1) = "," Then state.Position = state.Position + 1
+    Loop
+    state.Position = state.Position + 1 ' Skip '}'
+    Set ParseObject = dict
+End Function
+
+Private Function ParseArray(ByRef state As JsonParserState) As Object
+    Dim arr As Object
+    Set arr = CreateObject("Scripting.Dictionary")
+    Dim index As Long
+    state.Position = state.Position + 1 ' Skip '['
+    Do While Mid(state.Json, state.Position, 1) <> "]"
+        ParseWhitespace state
+        arr(index) = ParseValue(state)
+        index = index + 1
+        ParseWhitespace state
+        If Mid(state.Json, state.Position, 1) = "," Then state.Position = state.Position + 1
+    Loop
+    state.Position = state.Position + 1 ' Skip ']'
+    Set ParseArray = arr.Items
+End Function
+
+Private Function ParseValue(ByRef state As JsonParserState) As Variant
+    ParseWhitespace state
+    Dim nextChar As String
+    nextChar = Mid(state.Json, state.Position, 1)
+    If nextChar = "{" Then
+        Set ParseValue = ParseObject(state)
+    ElseIf nextChar = "[" Then
+        Set ParseValue = ParseArray(state)
+    ElseIf nextChar = """" Or nextChar = "'" Then
+        ParseValue = ParseString(state)
+    ElseIf IsNumeric(nextChar) Or nextChar = "-" Then
+        ParseValue = ParseNumber(state)
+    ElseIf nextChar = "t" Or nextChar = "f" Or nextChar = "n" Then
+        ParseValue = ParseBoolean(state)
+    Else
+        ParseValue = ParseNull(state)
+    End If
+End Function
+
+Private Function ParseString(ByRef state As JsonParserState) As String
+    Dim quoteType As String
+    quoteType = Mid(state.Json, state.Position, 1)
+    state.Position = state.Position + 1
+    Dim buffer As String
+    buffer = ""
+    Do While Mid(state.Json, state.Position, 1) <> quoteType
+        buffer = buffer & Mid(state.Json, state.Position, 1)
+        state.Position = state.Position + 1
+    Loop
+    state.Position = state.Position + 1 ' Skip closing quote
+    ParseString = buffer
+End Function
+
+Private Function ParseNumber(ByRef state As JsonParserState) As Double
+    Dim buffer As String
+    buffer = ""
+    Dim nextChar As String
+    Do
+        nextChar = Mid(state.Json, state.Position, 1)
+        If InStr("+-0123456789.eE", nextChar) Then
+            buffer = buffer & nextChar
+            state.Position = state.Position + 1
+        Else
+            Exit Do
+        End If
+    Loop
+    ParseNumber = Val(buffer)
+End Function
+
+Private Function ParseBoolean(ByRef state As JsonParserState) As Boolean
+    Dim next4 As String
+    next4 = Mid(state.Json, state.Position, 4)
+    If next4 = "true" Then
+        ParseBoolean = True
+        state.Position = state.Position + 4
+    Else
+        ParseBoolean = False
+        state.Position = state.Position + 5
+    End If
+End Function
+
+Private Function ParseNull(ByRef state As JsonParserState) As Variant
+    ParseNull = Null
+    state.Position = state.Position + 4
+End Function
+
+Private Sub ParseWhitespace(ByRef state As JsonParserState)
+    Do While InStr(" " & vbCrLf & vbTab, Mid(state.Json, state.Position, 1)) > 0
+        state.Position = state.Position + 1
+    Loop
+End Sub

@@ -1,0 +1,71 @@
+Option Explicit
+
+Sub ParseJSONAndExportToCSV()
+
+    ' Add reference to Microsoft Scripting Runtime for Dictionary support
+    ' Add reference to Microsoft XML, v6.0 for XMLHTTP support
+
+    Dim xmlhttp As Object
+    Dim url As String
+    Dim authToken As String
+    Dim jsonResponse As String
+    Dim jsonObject As Object
+    Dim resultArray As Object
+    Dim user As Object
+    Dim i As Integer
+    Dim output As String
+    
+    ' Set the API endpoint URL
+    url = "https://api.example.com/data"
+    
+    ' Set the authorization token
+    authToken = "Bearer YourAuthTokenHere"
+    
+    ' Create a new XMLHTTP object
+    Set xmlhttp = CreateObject("MSXML2.XMLHTTP")
+    
+    ' Open the URL with GET method
+    xmlhttp.Open "GET", url, False
+    
+    ' Set the authorization header
+    xmlhttp.setRequestHeader "Authorization", authToken
+    
+    ' Send the request
+    xmlhttp.send
+    
+    ' Check if the request was successful (status code 200)
+    If xmlhttp.Status = 200 Then
+        ' Get the response as text
+        jsonResponse = xmlhttp.responseText
+        
+        ' Parse JSON response
+        Set jsonObject = JsonConverter.ParseJson(jsonResponse)
+        Set resultArray = jsonObject("result")
+        
+        ' Output headers
+        output = "First Name,Last Name,Role,Last Access (System Date),Enabled" & vbCrLf
+        
+        ' Loop through users
+        For Each user In resultArray
+            output = output & user("firstName") & "," & user("lastName") & ","
+            output = output & Join(user("roles"), ",") & ","
+            output = output & Format(DateAdd("s", user("lastAccess"), "1970-01-01"), "yyyy-mm-dd hh:mm:ss") & ","
+            If user("enabled") = True Then
+                output = output & "Enabled"
+            Else
+                output = output & "Disabled"
+            End If
+            output = output & vbCrLf
+        Next user
+        
+        ' Write to CSV file
+        Open "user_data.csv" For Output As #1
+        Print #1, output
+        Close #1
+        
+        MsgBox "CSV file created successfully."
+    Else
+        MsgBox "Error: " & xmlhttp.Status & " - " & xmlhttp.statusText
+    End If
+
+End Sub
